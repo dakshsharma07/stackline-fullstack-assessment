@@ -120,3 +120,44 @@ fetch(`/api/products/${sku}`)
 This eliminates the XSS vulnerability, creates clean URLs like `/product?sku=ABC123`, and ensures fresh data from the API.
 
 ---
+
+### 5. Image Optimization Host Configuration (next/image)
+
+**Problem:** Runtime error: `Invalid src prop (...) on next/image, hostname "images-na.ssl-images-amazon.com" is not configured under images in your next.config.js`.
+
+**Root Cause:** The `images.remotePatterns` configuration was missing the `images-na.ssl-images-amazon.com` host used by some Amazon product images.
+
+**Impact:** Product images from that host failed to render/optimize, breaking visuals and causing runtime errors.
+
+#### What I Changed
+I updated the Next.js image configuration to allow the Amazon host:
+
+```typescript
+// Before
+images: {
+  remotePatterns: [
+    {
+      protocol: 'https',
+      hostname: 'm.media-amazon.com',
+    },
+  ],
+},
+
+// After
+images: {
+  remotePatterns: [
+    {
+      protocol: 'https',
+      hostname: 'm.media-amazon.com',
+    },
+    {
+      protocol: 'https',
+      hostname: 'images-na.ssl-images-amazon.com',
+    },
+  ],
+},
+```
+
+I then restarted the dev server to apply the change.
+
+---
