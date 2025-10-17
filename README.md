@@ -1,37 +1,122 @@
-# Stackline Full Stack Assignment
+# Bug Fixes and Changes
 
-## Overview
+## Issues I Fixed
 
-This is a sample eCommerce website that includes:
-- Product List Page
-- Search Results Page
-- Product Detail Page
+### 1. Subcategory Filtering Bug
 
-The application contains various bugs including UX issues, design problems, functionality bugs, and potential security vulnerabilities.
+**Problem:** When selecting a category, the subcategory dropdown was showing ALL subcategories from all categories instead of only the subcategories belonging to the selected category.
 
-## Getting Started
+**Root Cause:** The API call to fetch subcategories was missing the required category parameter.
 
-```bash
-yarn install
-yarn dev
+**Impact:** Users saw irrelevant subcategories, creating confusion and poor UX.
+
+#### What I Changed
+I added the missing category parameter to the API call:
+
+```typescript
+// Before
+fetch(`/api/subcategories`)
+
+// After  
+fetch(`/api/subcategories?category=${encodeURIComponent(selectedCategory)}`)
 ```
 
-## Your Task
+I used `encodeURIComponent()` to properly handle special characters and spaces in category names. Now when a user selects "Electronics", the API call becomes `GET /api/subcategories?category=Electronics` and only returns relevant subcategories.
 
-1. **Identify and fix bugs** - Review the application thoroughly and fix any issues you find
-2. **Document your work** - Create a comprehensive README that includes:
-   - What bugs/issues you identified
-   - How you fixed each issue
-   - Why you chose your approach
-   - Any improvements or enhancements you made
+---
 
-We recommend spending no more than 2 hours on this assignment. We are more interested in the quality of your work and your communication than the amount of time you spend or how many bugs you fix!
+### 2. Search API Spam Prevention
 
-## Submission
+**Problem:** The search input was making API calls on every keystroke, causing unnecessary server load and poor performance.
 
-- Fork this repository
-- Make your fixes and improvements
-- **Replace this README** with your own that clearly documents all changes and your reasoning
-- Provide your Stackline contact with a link to a git repository where you have committed your changes
+**Root Cause:** No debouncing mechanism for search input.
 
-We're looking for clear communication about your problem-solving process as much as the technical fixes themselves.
+**Impact:** Excessive API calls, potential server overload, and poor user experience.
+
+#### What I Changed
+I implemented a custom debounce hook to delay API calls until the user stops typing:
+
+```typescript
+// Added custom hook
+function useDebounce<T>(value: T, delay: number): T {
+  const [debouncedValue, setDebouncedValue] = useState<T>(value);
+  useEffect(() => {
+    const handler = setTimeout(() => setDebouncedValue(value), delay);
+    return () => clearTimeout(handler);
+  }, [value, delay]);
+  return debouncedValue;
+}
+
+// Used it in the component
+const debouncedSearch = useDebounce(search, 500);
+```
+
+Now the search API is only called 500ms after the user stops typing, reducing server load while keeping the UI responsive.
+
+---
+
+### 3. Clear Filters Button State Management
+
+**Problem:** Inconsistent state management when clearing filters - using empty strings vs undefined for category/subcategory reset.
+
+**Root Cause:** Mixed usage of empty strings and undefined for filter state reset.
+
+**Impact:** Potential inconsistencies in filter state and UI behavior.
+
+#### What I Changed
+I standardized the clear filters button to use `undefined` instead of empty strings:
+
+```typescript
+// Before
+setSelectedCategory(undefined);
+setSelectedSubCategory(undefined);
+
+// After
+setSelectedCategory("");
+setSelectedSubCategory("");
+```
+
+This ensures consistent state management and proper Select component behavior, where undefined shows the placeholder text.
+
+---
+
+### 4. Security Vulnerability: XSS Attack via URL Parameters
+
+**Problem:** Product data was being passed through URL query parameters using `JSON.stringify()`, creating a potential XSS vulnerability and exposing sensitive data in URLs.
+
+**Root Cause:** The application was serializing entire product objects into URL parameters for navigation to product detail pages.
+
+**Impact:** XSS vulnerability, data exposure in URLs, poor performance, and unshareable URLs.
+
+#### What I Changed
+I replaced the unsafe JSON approach with secure SKU-based navigation:
+
+```typescript
+// Before - Vulnerable
+<Link href={{
+  pathname: "/product",
+  query: { product: JSON.stringify(product) }
+}}>
+
+// After - Secure
+<Link href={{
+  pathname: "/product", 
+  query: { sku: product.stacklineSku }
+}}>
+```
+
+And updated the product page to fetch data via API instead of parsing JSON:
+
+```typescript
+// Before - Unsafe parsing
+const productParam = searchParams.get('product');
+const parsedProduct = JSON.parse(productParam);
+
+// After - Secure API call
+const sku = searchParams.get('sku');
+fetch(`/api/products/${sku}`)
+```
+
+This eliminates the XSS vulnerability, creates clean URLs like `/product?sku=ABC123`, and ensures fresh data from the API.
+
+---
