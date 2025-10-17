@@ -60,6 +60,21 @@ export default function Home() {
     string | undefined
   >(undefined);
   const [loading, setLoading] = useState(true);
+  const [currentPage, setCurrentPage] = useState<number>(1);
+  const [totalPages, setTotalPages] = useState<number>(1);
+  const LIMIT = 20;
+
+  // Initialize page from URL on first load
+  useEffect(() => {
+    const url = new URL(window.location.href);
+    const pageParam = url.searchParams.get("page");
+    if (pageParam) {
+      const parsed = parseInt(pageParam);
+      if (!Number.isNaN(parsed) && parsed > 0) {
+        setCurrentPage(parsed);
+      }
+    }
+  }, []);
 
   useEffect(() => {
     fetch("/api/categories")
@@ -81,18 +96,31 @@ export default function Home() {
   useEffect(() => {
     setLoading(true);
     const params = new URLSearchParams();
-    if (debouncedSearch) params.append("search", debouncedSearch); 
+    if (debouncedSearch) params.append("search", debouncedSearch);
     if (selectedCategory) params.append("category", selectedCategory);
     if (selectedSubCategory) params.append("subCategory", selectedSubCategory);
-    params.append("limit", "20");
+    params.append("limit", String(LIMIT));
+    params.append("offset", String((currentPage - 1) * LIMIT));
 
     fetch(`/api/products?${params}`)
       .then((res) => res.json())
       .then((data) => {
         setProducts(data.products);
+        setTotalPages(Math.max(1, Math.ceil(data.total / data.limit)));
         setLoading(false);
       });
-  }, [debouncedSearch, selectedCategory, selectedSubCategory]);
+  }, [debouncedSearch, selectedCategory, selectedSubCategory, currentPage]);
+
+  function updateURL(nextPage: number) {
+    const url = new URL(window.location.href);
+    const params = url.searchParams;
+    if (search) params.set("search", search); else params.delete("search");
+    if (selectedCategory) params.set("category", selectedCategory); else params.delete("category");
+    if (selectedSubCategory) params.set("subCategory", selectedSubCategory); else params.delete("subCategory");
+    params.set("page", String(nextPage));
+    url.search = params.toString();
+    window.history.replaceState({}, "", url.toString());
+  }
 
   return (
     <div className="min-h-screen bg-background">
@@ -106,14 +134,14 @@ export default function Home() {
               <Input
                 placeholder="Search products..."
                 value={search}
-                onChange={(e) => setSearch(e.target.value)}
+                onChange={(e) => { setSearch(e.target.value); setCurrentPage(1); }}
                 className="pl-10"
               />
             </div>
 
             <Select
               value={selectedCategory}
-              onValueChange={(value) => setSelectedCategory(value || undefined)}
+              onValueChange={(value) => { setSelectedCategory(value || undefined); setCurrentPage(1); }}
             >
               <SelectTrigger className="w-full md:w-[200px]">
                 <SelectValue placeholder="All Categories" />
@@ -130,9 +158,7 @@ export default function Home() {
             {selectedCategory && subCategories.length > 0 && (
               <Select
                 value={selectedSubCategory}
-                onValueChange={(value) =>
-                  setSelectedSubCategory(value || undefined)
-                }
+                onValueChange={(value) => { setSelectedSubCategory(value || undefined); setCurrentPage(1); }}
               >
                 <SelectTrigger className="w-full md:w-[200px]">
                   <SelectValue placeholder="All Subcategories" />
@@ -154,6 +180,7 @@ export default function Home() {
                   setSearch("");
                   setSelectedCategory("");
                   setSelectedSubCategory("");
+                  setCurrentPage(1);
                 }}
               >
                 Clear Filters
@@ -174,6 +201,33 @@ export default function Home() {
           </div>
         ) : (
           <>
+            <div className="flex items-center justify-end gap-3 mb-4">
+              <Button
+                variant="outline"
+                disabled={currentPage <= 1}
+                onClick={() => {
+                  const next = Math.max(1, currentPage - 1);
+                  setCurrentPage(next);
+                  updateURL(next);
+                }}
+              >
+                Previous
+              </Button>
+              <span className="text-sm text-muted-foreground">
+                Page {currentPage} of {totalPages}
+              </span>
+              <Button
+                variant="outline"
+                disabled={currentPage >= totalPages}
+                onClick={() => {
+                  const next = Math.min(totalPages, currentPage + 1);
+                  setCurrentPage(next);
+                  updateURL(next);
+                }}
+              >
+                Next
+              </Button>
+            </div>
             <p className="text-sm text-muted-foreground mb-4">
               Showing {products.length} products
             </p>
@@ -221,6 +275,33 @@ export default function Home() {
                   </Card>
                 </Link>
               ))}
+            </div>
+            <div className="flex items-center justify-center gap-3 mt-8">
+              <Button
+                variant="outline"
+                disabled={currentPage <= 1}
+                onClick={() => {
+                  const next = Math.max(1, currentPage - 1);
+                  setCurrentPage(next);
+                  updateURL(next);
+                }}
+              >
+                Previous
+              </Button>
+              <span className="text-sm text-muted-foreground">
+                Page {currentPage} of {totalPages}
+              </span>
+              <Button
+                variant="outline"
+                disabled={currentPage >= totalPages}
+                onClick={() => {
+                  const next = Math.min(totalPages, currentPage + 1);
+                  setCurrentPage(next);
+                  updateURL(next);
+                }}
+              >
+                Next
+              </Button>
             </div>
           </>
         )}

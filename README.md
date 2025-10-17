@@ -121,7 +121,56 @@ This eliminates the XSS vulnerability, creates clean URLs like `/product?sku=ABC
 
 ---
 
-### 5. Image Optimization Host Configuration (next/image)
+### 5. Landing Page Missing Products
+
+**Problem:** Only 20 products displayed in the landing page so users had to search exactly what they were looking for.
+
+**Root Cause:** The home page fetched a fixed `limit` of 20 items without passing an `offset`, and there were no UI controls for paging.
+
+**Impact:** Users couldn’t browse beyond the first page of results, harming discoverability and UX. From a business standpoint, this prevented them from being introducted to new products and potentially purchasing.
+
+#### What I Changed
+I added a pagination mechanism on the client, wiring it to the existing API which already supports `limit` and `offset`. The feature is available at the top right and bottom of each page.
+
+```typescript
+// In app/page.tsx
+// Added state
+const [currentPage, setCurrentPage] = useState<number>(1);
+const [totalPages, setTotalPages] = useState<number>(1);
+const LIMIT = 20;
+
+// Include offset in fetch
+params.append("limit", String(LIMIT));
+params.append("offset", String((currentPage - 1) * LIMIT));
+
+// Use API response to compute total pages
+setTotalPages(Math.max(1, Math.ceil(data.total / data.limit)));
+
+// Simple controls
+<Button onClick={() => setCurrentPage(Math.max(1, currentPage - 1))}>
+  Previous
+</Button>
+<span>Page {currentPage} of {totalPages}</span>
+<Button onClick={() => setCurrentPage(Math.min(totalPages, currentPage + 1))}>
+  Next
+</Button>
+```
+
+I also synced the page number into the URL (`?page=`) to preserve navigation state:
+
+```typescript
+function updateURL(nextPage: number) {
+  const url = new URL(window.location.href);
+  url.searchParams.set("page", String(nextPage));
+  window.history.replaceState({}, "", url.toString());
+}
+```
+
+Now users can browse all products page-by-page, with predictable performance and URL state that can be shared or revisited.
+
+---
+
+### 6. Image Optimization Host Configuration (next/image)
 
 **Problem:** Runtime error: `Invalid src prop (...) on next/image, hostname "images-na.ssl-images-amazon.com" is not configured under images in your next.config.js`.
 
