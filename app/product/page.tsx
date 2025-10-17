@@ -21,20 +21,17 @@ interface Product {
 
 export default function ProductPage() {
   const searchParams = useSearchParams();
-  const productParam = searchParams.get('product');
+  const sku = searchParams.get('sku');
   const [product, setProduct] = useState<Product | null>(null);
   const [selectedImage, setSelectedImage] = useState(0);
 
   useEffect(() => {
-    if (productParam) {
-      try {
-        const parsedProduct = JSON.parse(productParam);
-        setProduct(parsedProduct);
-      } catch (error) {
-        console.error('Failed to parse product data:', error);
-      }
+    if (sku) {
+      fetch(`/api/products/${sku}`)
+        .then((res) => res.json())
+        .then((data) => setProduct(data));
     }
-  }, [productParam]);
+  }, [sku]);
 
   if (!product) {
     return (

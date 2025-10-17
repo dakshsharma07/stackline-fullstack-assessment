@@ -1,6 +1,22 @@
 "use client";
 
 import { useState, useEffect } from "react";
+
+function useDebounce<T>(value: T, delay: number): T {
+  const [debouncedValue, setDebouncedValue] = useState<T>(value);
+
+  useEffect(() => {
+    const handler = setTimeout(() => {
+      setDebouncedValue(value);
+    }, delay);
+
+    return () => {
+      clearTimeout(handler);
+    };
+  }, [value, delay]);
+
+  return debouncedValue;
+}
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 import {
@@ -36,6 +52,7 @@ export default function Home() {
   const [categories, setCategories] = useState<string[]>([]);
   const [subCategories, setSubCategories] = useState<string[]>([]);
   const [search, setSearch] = useState("");
+  const debouncedSearch = useDebounce(search, 500);
   const [selectedCategory, setSelectedCategory] = useState<string | undefined>(
     undefined
   );
@@ -52,7 +69,7 @@ export default function Home() {
 
   useEffect(() => {
     if (selectedCategory) {
-      fetch(`/api/subcategories`)
+      fetch(`/api/subcategories?category=${encodeURIComponent(selectedCategory)}`)
         .then((res) => res.json())
         .then((data) => setSubCategories(data.subCategories));
     } else {
@@ -64,7 +81,7 @@ export default function Home() {
   useEffect(() => {
     setLoading(true);
     const params = new URLSearchParams();
-    if (search) params.append("search", search);
+    if (debouncedSearch) params.append("search", debouncedSearch); 
     if (selectedCategory) params.append("category", selectedCategory);
     if (selectedSubCategory) params.append("subCategory", selectedSubCategory);
     params.append("limit", "20");
@@ -75,7 +92,7 @@ export default function Home() {
         setProducts(data.products);
         setLoading(false);
       });
-  }, [search, selectedCategory, selectedSubCategory]);
+  }, [debouncedSearch, selectedCategory, selectedSubCategory]);
 
   return (
     <div className="min-h-screen bg-background">
@@ -135,8 +152,8 @@ export default function Home() {
                 variant="outline"
                 onClick={() => {
                   setSearch("");
-                  setSelectedCategory(undefined);
-                  setSelectedSubCategory(undefined);
+                  setSelectedCategory("");
+                  setSelectedSubCategory("");
                 }}
               >
                 Clear Filters
@@ -166,7 +183,7 @@ export default function Home() {
                   key={product.stacklineSku}
                   href={{
                     pathname: "/product",
-                    query: { product: JSON.stringify(product) },
+                    query: { sku: product.stacklineSku }, 
                   }}
                 >
                   <Card className="h-full hover:shadow-lg transition-shadow cursor-pointer">
